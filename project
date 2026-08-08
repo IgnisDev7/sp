@@ -1,0 +1,105 @@
+import streamlit as st
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from datetime import datetime
+import csv
+import os
+
+# --- Simple Helper Functions (Basic Math Only) ---
+def calculate_bmi(weight_kg, height_cm):
+    height_m = height_cm / 100
+    return round(weight_kg / (height_m * height_m), 2)
+
+def calculate_bmr(weight_kg, height_cm, age, gender):
+    # Simple Mifflin-St Jeor Equation
+    if gender == "Male":
+        return round(10 * weight_kg + 6.25 * height_cm - 5 * age + 5)
+    else:
+        return round(10 * weight_kg + 6.25 * height_cm - 5 * age - 161)
+
+def calculate_water_intake(weight_kg):
+    # Simple rule: 30ml per kg
+    return round(weight_kg * 0.03, 2)
+
+def calculate_health_score(bmi, sleep_hours, water_intake, exercise_mins):
+    # Very simple scoring out of 100 for school level
+    score = 50
+    if 18.5 <= bmi <= 24.9: score += 20
+    if sleep_hours >= 7: score += 15
+    if water_intake >= 2.0: score += 10
+    if exercise_mins >= 30: score += 5
+    return min(score, 100)
+
+# --- Save History to CSV (Simple Storage) ---
+def save_to_csv(data):
+    file_exists = os.path.isfile("health_history.csv")
+    with open("health_history.csv", "a", newline="") as f:
+        writer = csv.writer(f)
+        if not file_exists:
+            writer.writerow(["Date", "BMI", "Water_Intake_L", "Sleep_Hours", "Health_Score"])
+        writer.writerow(data)
+
+# --- Streamlit Web Interface ---
+st.set_page_config(page_title="HealthCheck", page_icon="🏥")
+st.title("🏥 HealthCheck – Personal Health Analyzer")
+
+# 🏠 Dashboard
+st.header("🏠 Dashboard")
+st.success("Welcome to your Personal Health Analyzer!")
+st.info(f"📅 Today's Date: {datetime.now().strftime('%Y-%m-%d')}")
+
+# 📝 Health Checkup Form
+st.header("📝 Quick Health Checkup")
+age = st.number_input("Age", min_value=5, max_value=100, value=20)
+height = st.number_input("Height (cm)", min_value=50, max_value=250, value=170)
+weight = st.number_input("Weight (kg)", min_value=10, max_value=200, value=65)
+gender = st.selectbox("Gender", ["Male", "Female"])
+sleep_hours = st.slider("Sleep Hours Last Night", 0, 12, 7)
+water_intake = st.slider("Water Intake Today (Liters)", 0.0, 5.0, 2.0)
+exercise_mins = st.slider("Exercise Time (Minutes)", 0, 180, 30)
+
+# 🧮 Calculations & Health Score
+if st.button("Calculate My Health"):
+    bmi = calculate_bmi(weight, height)
+    bmr = calculate_bmr(weight, height, age, gender)
+    water_goal = calculate_water_intake(weight)
+    health_score = calculate_health_score(bmi, sleep_hours, water_intake, exercise_mins)
+
+    st.subheader("🧮 Your Health Results")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("BMI", bmi)
+    col2.metric("BMR (Calories)", bmr)
+    col3.metric("Daily Water Goal (L)", water_goal)
+
+    st.progress(health_score / 100)
+    st.write(f"**Your Health Score: {health_score}/100**")
+
+    # Save to history
+    save_to_csv([datetime.now().strftime("%Y-%m-%d"), bmi, water_intake, sleep_hours, health_score])
+    st.success("✅ Results saved to history!")
+
+# 📊 Reports & Graphs
+st.header("📊 Health Reports")
+if os.path.isfile("health_history.csv"):
+    df = pd.read_csv("health_history.csv")
+
+    st.subheader("Weekly Health Statistics")
+    st.line_chart(df[["BMI", "Sleep_Hours", "Health_Score"]])
+
+    st.subheader("📈 BMI History Graph")
+    fig, ax = plt.subplots()
+    ax.plot(df["Date"], df["BMI"], marker="o", color="green")
+    ax.set_title("BMI Over Time")
+    ax.set_xlabel("Date")
+    ax.set_ylabel("BMI")
+    st.pyplot(fig)
+else:
+    st.warning("No history yet. Complete a health checkup first!")
+
+# 🎯 Daily Goals
+st.header("🎯 Daily Goals")
+st.checkbox("💧 Drink 2L Water")
+st.checkbox("😴 Sleep 7+ Hours")
+st.checkbox("🏃 Exercise 30 Minutes")
+st.checkbox("👣 Walk 10,000 Steps")
